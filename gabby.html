@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wealth Portfolio - Jon Meyer</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#f5f7fb;--card:#ffffff;--muted:#64748b;--text:#0f172a;--border:#e2e8f0;--accent:#2563eb;--accent2:#06b6d4;--green:#16a34a;--red:#dc2626;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Ubuntu,sans-serif;background:linear-gradient(135deg,#eef2ff,#ecfeff);color:var(--text)}
+    .layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+    .sidebar{background:#1e293b;color:white;padding:20px}
+    .logo{font-weight:700;font-size:18px;margin-bottom:20px}
+    .nav a{display:block;padding:12px;border-radius:10px;color:#cbd5f5;text-decoration:none;margin-bottom:6px;cursor:pointer}
+    .nav a.active,.nav a:hover{background:#334155}
+
+    .content{padding:30px}
+    .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+    .profile{display:flex;gap:10px;align-items:center}
+    .avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2))}
+    .badge{background:#dcfce7;color:#166534;padding:4px 10px;border-radius:999px;font-size:12px}
+
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+    .card{background:var(--card);border:1px solid var(--border);padding:18px;border-radius:14px;box-shadow:0 8px 20px rgba(0,0,0,0.05)}
+
+    .title{color:var(--muted);font-size:13px}
+    .balance{font-size:30px;font-weight:600;margin-top:6px}
+    .positive{color:var(--green);font-size:13px}
+
+    .table{width:100%;border-collapse:collapse;font-size:14px}
+    .table th,.table td{padding:12px;border-bottom:1px solid var(--border)}
+    .table th{color:var(--muted);text-align:left}
+    .buy{color:var(--green)}
+    .sell{color:var(--red)}
+
+    .hidden{display:none}
+
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:12px;margin-right:6px}
+
+    input, select{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:1px solid var(--border);font-size:14px}
+    input:focus, select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,0.1)}
+
+    button{margin-top:12px;width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer;transition:opacity 0.2s}
+    button:disabled{opacity:0.6;cursor:not-allowed}
+
+    /* Login Overlay */
+    .login-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#0f172a,#1e293b);z-index:2000;display:flex;align-items:center;justify-content:center;transition:all 0.4s ease}
+    .login-card{background:white;padding:40px;border-radius:24px;width:380px;max-width:90%;box-shadow:0 25px 50px rgba(0,0,0,0.3);text-align:center}
+    .login-card h2{color:#0f172a;margin-bottom:8px}
+    .login-card .sub{color:#64748b;margin-bottom:24px;font-size:14px}
+    .login-card input{margin:12px 0}
+    .login-error{color:#dc2626;font-size:13px;margin-top:8px;display:none}
+    .login-btn{background:linear-gradient(135deg,#2563eb,#06b6d4);margin-top:20px}
+    .login-logo{font-size:28px;font-weight:700;background:linear-gradient(135deg,#2563eb,#06b6d4);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:16px}
+
+    /* Modal */
+    .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;visibility:hidden;opacity:0;transition:0.3s;z-index:1000}
+    .modal.active{visibility:visible;opacity:1}
+    .modal-box{background:white;padding:24px;border-radius:14px;width:320px;text-align:center;max-width:90%}
+    .modal-box h3{margin:0 0 10px}
+    .success{color:var(--green);font-weight:600}
+    .error-message{color:var(--red);font-weight:600;margin-top:12px}
+    .loader{border:3px solid #e2e8f0;border-top:3px solid var(--accent);border-radius:50%;width:32px;height:32px;animation:spin 0.8s linear infinite;margin:15px auto}
+    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+    .fee-details{background:#fef9e3;padding:12px;border-radius:12px;margin-top:15px;font-size:13px;text-align:left;border-left:3px solid #e67e22}
+    .fee-details strong{color:#b45f06}
+    .action-button{background:#2c3e66;margin-top:8px}
+    .logout-btn{background:rgba(255,255,255,0.1);padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;transition:0.2s;margin-left:12px}
+    .logout-btn:hover{background:rgba(255,255,255,0.2)}
+    .header-right{display:flex;align-items:center;gap:12px}
+  </style>
+</head>
+<body>
+  <!-- LOGIN OVERLAY -->
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <div class="login-logo">💰 FinWealth</div>
+      <h2>Welcome Back</h2>
+      <div class="sub">Sign in to access your portfolio</div>
+      <input type="text" id="loginUsername" placeholder="Username" autocomplete="off" />
+      <input type="password" id="loginPassword" placeholder="Password" />
+      <button class="login-btn" onclick="attemptLogin()">Sign In</button>
+      <div id="loginError" class="login-error">Invalid credentials. Try JonMeyer / P@$$word</div>
+      <div style="margin-top:16px; font-size:12px; color:#94a3b8;">Demo: JonMeyer / P@$$word</div>
+    </div>
+  </div>
+
+  <!-- MAIN APP (initially hidden until login) -->
+  <div id="appContainer" style="display:none;">
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="logo">FinWealth</div>
+        <div class="nav">
+          <a class="active" onclick="showPage('dashboard')">Dashboard</a>
+          <a onclick="showPage('transactions')">Transactions</a>
+          <a onclick="showPage('withdrawal')">Withdraw</a>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div class="header">
+          <div>
+            <h2>Portfolio Overview</h2>
+            <div class="title">Wealth performance & insights</div>
+          </div>
+          <div class="header-right">
+            <div class="profile">
+              <div class="avatar"></div>
+              <div>
+                <div><strong>Jon Meyer</strong></div>
+                <div class="badge">Premium Client</div>
+              </div>
+            </div>
+            <div class="logout-btn" onclick="logout()">🚪 Logout</div>
+          </div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="dashboard">
+          <div class="grid">
+            <div class="card">
+              <div class="title">Total Balance</div>
+              <div class="balance">$17,245,890.32</div>
+              <div class="positive">+$124,000 today</div>
+            </div>
+            <div class="card">
+              <div class="title">Monthly Income</div>
+              <div class="balance">$84,200</div>
+              <div class="positive">+5.4%</div>
+            </div>
+            <div class="card">
+              <div class="title">Risk Level</div>
+              <div class="balance">High</div>
+              <div class="pill">Diversified</div>
+              <div class="pill">Growth Focused</div>
+            </div>
+            <div class="card">
+              <div class="title">Asset Allocation</div>
+              <ul>
+                <li>Equities — $9.2M</li>
+                <li>Private Equity — $3.5M</li>
+                <li>Real Estate — $4.5M</li>
+              </ul>
+            </div>
+          </div>
+          <div class="card" style="margin-top:18px;">
+            <div class="title">Portfolio Growth (2012 - 2016)</div>
+            <canvas id="chart"></canvas>
+          </div>
+        </div>
+
+        <!-- TRANSACTIONS -->
+        <div id="transactions" class="hidden">
+          <div class="card">
+            <div class="title">Transaction History</div>
+            <table class="table">
+              <thead><tr><th>Date</th><th>Type</th><th>Asset</th><th>Amount</th></tr></thead>
+              <tbody>
+                <tr><td>Jan 05, 2012</td><td class="buy">Buy</td><td>Index Fund</td><td>$50,000</td></tr>
+                <tr><td>Sep 14, 2012</td><td class="buy">Buy</td><td>Blue Chip Stocks</td><td>$75,000</td></tr>
+                <tr><td>Mar 22, 2013</td><td class="buy">Buy</td><td>Real Estate Trust</td><td>$120,000</td></tr>
+                <tr><td>Nov 03, 2013</td><td class="sell">Sell</td><td>Utilities Stocks</td><td>$60,000</td></tr>
+                <tr><td>Feb 18, 2014</td><td class="buy">Buy</td><td>Equity Fund</td><td>$140,000</td></tr>
+                <tr><td>Jul 09, 2014</td><td class="buy">Buy</td><td>Commercial Property</td><td>$260,000</td></tr>
+                <tr><td>Dec 01, 2014</td><td class="sell">Sell</td><td>Retail Stocks</td><td>$95,000</td></tr>
+                <tr><td>Apr 11, 2015</td><td class="buy">Buy</td><td>Private Equity</td><td>$320,000</td></tr>
+                <tr><td>Aug 27, 2015</td><td class="buy">Buy</td><td>Infrastructure Fund</td><td>$210,000</td></tr>
+                <tr><td>Jan 10, 2016</td><td class="buy">Buy</td><td>Index Fund</td><td>$180,000</td></tr>
+                <tr><td>Jun 22, 2016</td><td class="buy">Buy</td><td>Commercial Property</td><td>$300,000</td></tr>
+                <tr><td>Nov 11, 2016</td><td class="sell">Sell</td><td>Energy Stocks</td><td>$150,000</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- WITHDRAWAL -->
+        <div id="withdrawal" class="hidden">
+          <div class="card">
+            <div class="title">Withdraw Funds</div>
+            <div id="limitWarning" style="background:#fff3e0; padding:10px; border-radius:8px; margin-bottom:15px; font-size:13px; border-left:3px solid #f97316;">
+              ⚡ Daily withdrawal limit: <strong>$800,000</strong>. Remaining today: <strong>$800,000</strong>
+            </div>
+            <label>Amount</label>
+            <input id="amount" type="number" placeholder="$ Enter amount (max 800,000)" />
+            <label>Bank Type</label>
+            <select id="bankType">
+              <option>Wells Fargo</option><option>Chase Bank</option><option>Bank of America</option>
+              <option>Citibank</option><option>Capital One</option><option>HSBC</option>
+              <option>TD Bank</option><option>PNC Bank</option><option>U.S. Bank</option><option>Goldman Sachs</option>
+            </select>
+            <label>Routing Number</label>
+            <input id="routing" type="text" placeholder="Enter routing number" />
+            <label>Account Number / IBAN</label>
+            <input id="account" type="text" placeholder="Enter account details" />
+            <button id="withdrawBtn" onclick="submitWithdrawal()">Request Withdrawal</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- MAIN MODAL (dynamic) -->
+  <div id="modal" class="modal">
+    <div id="modalDynamicContent" class="modal-box">
+      <h3>Confirm Withdrawal</h3>
+      <p id="summary"></p>
+      <button id="confirmModalBtn">Confirm</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------- AUTHENTICATION ----------
+    const VALID_USERNAME = "JonMeyer";
+    const VALID_PASSWORD = "P@$$word";
+    let isAuthenticated = false;
+
+    function attemptLogin() {
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errorDiv = document.getElementById('loginError');
+      
+      if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+        isAuthenticated = true;
+        // Hide login overlay, show main app
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('appContainer').style.display = 'block';
+        errorDiv.style.display = 'none';
+        // Initialize app after login
+        initAppAfterLogin();
+      } else {
+        errorDiv.style.display = 'block';
+        // Shake animation subtle
+        const loginCard = document.querySelector('.login-card');
+        loginCard.style.transform = 'shake 0.3s ease-in-out';
+        setTimeout(() => { loginCard.style.transform = ''; }, 300);
+      }
+    }
+
+    function logout() {
+      isAuthenticated = false;
+      // Reset daily withdrawal limit for next session
+      dailyWithdrawn = 0;
+      updateLimitUI();
+      // Show login overlay, hide app
+      document.getElementById('loginOverlay').style.display = 'flex';
+      document.getElementById('appContainer').style.display = 'none';
+      // Clear login fields
+      document.getElementById('loginUsername').value = '';
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginError').style.display = 'none';
+      // Reset any open modals
+      const modal = document.getElementById('modal');
+      if (modal.classList.contains('active')) modal.classList.remove('active');
+      resetModalToDefault();
+      // Re-enable withdraw button if disabled
+      const withdrawBtn = document.getElementById('withdrawBtn');
+      if (withdrawBtn) withdrawBtn.disabled = false;
+      // Reset page to dashboard
+      showPage('dashboard');
+    }
+
+    // ---------- DAILY WITHDRAWAL LIMIT ----------
+    let dailyWithdrawn = 0;
+    const DAILY_LIMIT = 800000;
+
+    function checkDailyLimit(amount) {
+      if (amount > DAILY_LIMIT) {
+        return { allowed: false, reason: `Amount exceeds daily limit of $${DAILY_LIMIT.toLocaleString()}.` };
+      }
+      if (dailyWithdrawn + amount > DAILY_LIMIT) {
+        const remaining = DAILY_LIMIT - dailyWithdrawn;
+        return { allowed: false, reason: `Daily limit reached. You have $${remaining.toLocaleString()} remaining for today.` };
+      }
+      return { allowed: true };
+    }
+
+    function updateLimitUI() {
+      const limitWarningDiv = document.getElementById('limitWarning');
+      if (limitWarningDiv) {
+        const remaining = DAILY_LIMIT - dailyWithdrawn;
+        limitWarningDiv.innerHTML = `⚡ Daily withdrawal limit: <strong>$${DAILY_LIMIT.toLocaleString()}</strong>. Remaining today: <strong>$${remaining.toLocaleString()}</strong>`;
+        if (remaining <= 0) {
+          limitWarningDiv.style.background = "#ffe0e0";
+          limitWarningDiv.style.borderLeftColor = "#dc2626";
+        } else {
+          limitWarningDiv.style.background = "#fff3e0";
+          limitWarningDiv.style.borderLeftColor = "#f97316";
+        }
+      }
+    }
+
+    // ---------- MAINTENANCE FEE BILL (TOTAL ~$5,000) ----------
+    function getMaintenanceFeeBill() {
+      // Total exactly $5,000 with elegant breakdown
+      const baseMaintenance = 2500;
+      const complianceFee = 1200;
+      const platformFee = 800;
+      const serviceCharge = 500;
+      const totalDue = baseMaintenance + complianceFee + platformFee + serviceCharge; // = 5000
+      return {
+        totalDue: totalDue,
+        breakdown: {
+          "Annual Account Maintenance": baseMaintenance,
+          "Compliance & Regulatory Fee": complianceFee,
+          "Platform Infrastructure Fee": platformFee,
+          "Premium Support Service": serviceCharge
+        },
+        dueDate: "April 30, 2026",
+        accountStatus: "Suspended - Payment Required"
+      };
+    }
+
+    // ---------- WITHDRAWAL FLOW WITH SUSPENSION & BILLING ----------
+    function processWithdrawalAfterConfirm(amountVal, bankVal, routingVal, accountVal) {
+      const modalContentDiv = document.getElementById('modalDynamicContent');
+      modalContentDiv.innerHTML = `
+        <h3>Processing Request</h3>
+        <div class="loader"></div>
+        <p style="margin-top:12px;">Verifying account credentials & compliance...</p>
+      `;
+      
+      setTimeout(() => {
+        const feeBill = getMaintenanceFeeBill();
+        const formattedTotal = `$${feeBill.totalDue.toLocaleString()}`;
+        
+        let breakdownHtml = '';
+        for (const [key, value] of Object.entries(feeBill.breakdown)) {
+          breakdownHtml += `<div style="display:flex; justify-content:space-between; margin:6px 0;"><span>${key}:</span><strong>$${value.toLocaleString()}</strong></div>`;
+        }
+        
+        modalContentDiv.innerHTML = `
+          <div style="text-align:left;">
+            <h3 style="color:#b91c1c; margin-bottom:8px;">⚠️ Account Suspended</h3>
+            <p style="color:#2d3748; font-size:14px;">Access to this account has been suspended due to unresolved maintenance fees.</p>
+            <div class="fee-details">
+              <strong>📄 Outstanding Maintenance Fee Bill</strong>
+              ${breakdownHtml}
+              <hr style="margin:8px 0;">
+              <div style="display:flex; justify-content:space-between; font-weight:700;"><span>Total Due:</span><span style="color:#b45f06;">${formattedTotal}</span></div>
+              <div style="margin-top:8px;"><span>📅 Due by: ${feeBill.dueDate}</span></div>
+              <div style="margin-top:8px;"><span>🏦 Account status: ${feeBill.accountStatus}</span></div>
+            </div>
+            <p style="font-size:12px; color:#4b5563; margin-top:12px;">To restore full access, please settle the maintenance fee via our billing department. Further withdrawal privileges are locked.</p>
+            <button id="closeSuspensionModalBtn" style="margin-top:16px; background:#334155;">Close</button>
+          </div>
+        `;
+        
+        const closeBtn = document.getElementById('closeSuspensionModalBtn');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => {
+            document.getElementById('modal').classList.remove('active');
+            resetModalToDefault();
+          });
+        }
+        
+        const withdrawBtn = document.getElementById('withdrawBtn');
+        if (withdrawBtn) withdrawBtn.disabled = false;
+      }, 1800);
+    }
+
+    function resetModalToDefault() {
+      const modalContentDiv = document.getElementById('modalDynamicContent');
+      modalContentDiv.innerHTML = `
+        <h3>Confirm Withdrawal</h3>
+        <p id="summary"></p>
+        <button id="confirmModalBtn">Confirm</button>
+      `;
+      const newConfirmBtn = document.getElementById('confirmModalBtn');
+      if (newConfirmBtn) {
+        newConfirmBtn.addEventListener('click', confirmWithdrawal);
+      }
+    }
+
+    function confirmWithdrawal() {
+      const amountInput = document.getElementById('amount');
+      const bankSelect = document.getElementById('bankType');
+      const routingInput = document.getElementById('routing');
+      const accountInput = document.getElementById('account');
+      
+      const amountVal = parseFloat(amountInput.value);
+      const bankVal = bankSelect.value;
+      const routingVal = routingInput.value.trim();
+      const accountVal = accountInput.value.trim();
+      
+      if (isNaN(amountVal) || amountVal <= 0) {
+        alert("Invalid amount. Please enter a positive number.");
+        return;
+      }
+      if (!routingVal) {
+        alert("Routing number is required.");
+        return;
+      }
+      if (!accountVal) {
+        alert("Account number is required.");
+        return;
+      }
+      
+      const limitCheck = checkDailyLimit(amountVal);
+      if (!limitCheck.allowed) {
+        const modalContentDiv = document.getElementById('modalDynamicContent');
+        modalContentDiv.innerHTML = `
+          <h3 style="color:#dc2626;">Withdrawal Declined</h3>
+          <p>${limitCheck.reason}</p>
+          <button onclick="closeModalAndReset()">OK</button>
+        `;
+        return;
+      }
+      
+      const withdrawBtn = document.getElementById('withdrawBtn');
+      if (withdrawBtn) withdrawBtn.disabled = true;
+      
+      processWithdrawalAfterConfirm(amountVal, bankVal, routingVal, accountVal);
+    }
+
+    function closeModalAndReset() {
+      const modal = document.getElementById('modal');
+      modal.classList.remove('active');
+      resetModalToDefault();
+      const withdrawBtn = document.getElementById('withdrawBtn');
+      if (withdrawBtn) withdrawBtn.disabled = false;
+    }
+
+    function submitWithdrawal() {
+      const amountInput = document.getElementById('amount');
+      const bankSelect = document.getElementById('bankType');
+      const routingInput = document.getElementById('routing');
+      const accountInput = document.getElementById('account');
+      
+      let amountVal = parseFloat(amountInput.value);
+      const bankVal = bankSelect.value;
+      const routingVal = routingInput.value.trim();
+      const accountVal = accountInput.value.trim();
+      
+      if (isNaN(amountVal) || amountVal <= 0) {
+        alert('Please enter a valid amount greater than zero.');
+        return;
+      }
+      if (!routingVal) {
+        alert('Please enter a routing number.');
+        return;
+      }
+      if (!accountVal) {
+        alert('Please enter account number / IBAN.');
+        return;
+      }
+      
+      const limitCheck = checkDailyLimit(amountVal);
+      if (!limitCheck.allowed) {
+        alert(limitCheck.reason);
+        return;
+      }
+      
+      const summaryElem = document.getElementById('summary');
+      if (summaryElem) {
+        summaryElem.innerText = `Withdraw $${amountVal.toLocaleString()} via ${bankVal} account ending with ${accountVal.slice(-4)}? Daily limit remaining: $${(DAILY_LIMIT - dailyWithdrawn).toLocaleString()}`;
+      }
+      
+      const modal = document.getElementById('modal');
+      modal.classList.add('active');
+      
+      const confirmBtn = document.getElementById('confirmModalBtn');
+      if (confirmBtn) {
+        const newBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+        newBtn.addEventListener('click', confirmWithdrawal);
+      }
+    }
+
+    // ---------- PAGE NAVIGATION ----------
+    function showPage(page) {
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('transactions').classList.add('hidden');
+      document.getElementById('withdrawal').classList.add('hidden');
+      document.getElementById(page).classList.remove('hidden');
+      if (page === 'withdrawal') {
+        updateLimitUI();
+      }
+      // Update active nav style
+      const navLinks = document.querySelectorAll('.nav a');
+      navLinks.forEach(link => link.classList.remove('active'));
+      if (page === 'dashboard') navLinks[0]?.classList.add('active');
+      else if (page === 'transactions') navLinks[1]?.classList.add('active');
+      else if (page === 'withdrawal') navLinks[2]?.classList.add('active');
+    }
+
+    // ---------- INIT AFTER LOGIN ----------
+    function initAppAfterLogin() {
+      // Reset any withdrawal state
+      dailyWithdrawn = 0;
+      updateLimitUI();
+      resetModalToDefault();
+      const withdrawBtn = document.getElementById('withdrawBtn');
+      if (withdrawBtn) withdrawBtn.disabled = false;
+      showPage('dashboard');
+      
+      // Re-initialize chart if needed (already exists)
+      if (!window.chartInitialized) {
+        const ctx = document.getElementById('chart');
+        if (ctx && !window.chartInstance) {
+          window.chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: ['2012', '2013', '2014', '2015', '2016'],
+              datasets: [{
+                data: [50000, 150000, 400000, 900000, 1500000],
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37,99,235,0.1)',
+                fill: true,
+                tension: 0.4
+              }]
+            },
+            options: { plugins: { legend: { display: false } } }
+          });
+          window.chartInitialized = true;
+        }
+      }
+    }
+
+    // Attach global functions
+    window.showPage = showPage;
+    window.submitWithdrawal = submitWithdrawal;
+    window.confirmWithdrawal = confirmWithdrawal;
+    window.closeModalAndReset = closeModalAndReset;
+    window.attemptLogin = attemptLogin;
+    window.logout = logout;
+    
+    // Prevent access without login (initial state)
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
+    
+    // Allow Enter key on login
+    document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') attemptLogin();
+    });
+    document.getElementById('loginUsername').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') attemptLogin();
+    });
+    
+    // Initialize chart variable
+    window.chartInitialized = false;
+    window.chartInstance = null;
+    
+    // Set up mutation observer for modal close
+    const modalElem = document.getElementById('modal');
+    const observer = new MutationObserver(function() {
+      if (!modalElem.classList.contains('active')) {
+        const btn = document.getElementById('withdrawBtn');
+        if (btn) btn.disabled = false;
+      }
+    });
+    observer.observe(modalElem, { attributes: true, attributeFilter: ['class'] });
+  </script>
+</body>
+</html>
